@@ -1,3 +1,5 @@
+use rand::Rng;
+
 pub const SCREEN_WIDTH: usize = 64;
 pub const SCREEN_HEIGHT: usize = 32;
 const RAM_SIZE: usize = 4096;
@@ -52,6 +54,15 @@ impl Emu {
         };
 
         new_emu.ram[..80].copy_from_slice(&FONTSET);
+
+        new_emu.ram[0x200] = 0xC0;
+        new_emu.ram[0x201] = 0xFF;
+
+        // 8XY4 -> 8014 -> V0 = V0 + V1 (Toplama testi için)
+        // Önce V1'e bir değer verelim (Manuel)
+        new_emu.v_reg[1] = 10;
+        new_emu.ram[0x202] = 0x80;
+        new_emu.ram[0x203] = 0x14;
 
         new_emu
     }
@@ -177,6 +188,48 @@ impl Emu {
                 self.v_reg[x] ^= self.v_reg[y];
             }
 
+            (8, _, _, 4) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+
+                let (result, overflow) = self.v_reg[x].overflowing_add(self.v_reg[y]);
+                self.v_reg[x] = result;
+                self.v_reg[0xF] = if overflow { 1 } else { 0 };
+            }
+
+            // 8XY5 - SUB VX, VY (Set VF = NOT borrow)
+            // Eğer VX > VY ise VF = 1 (Borç almaya gerek yok)
+            (8, _, _, 5) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+
+                self.v_reg[0xF] = if self.v_reg[x] > self.v_reg[y] { 1 } else { 0 };
+                self.v_reg[x] = self.v_reg[x].wrapping_sub(self.v_reg[y]);
+            }
+
+            // 8XY6 - SHR VX (Shift Right by 1)
+            // En sağdaki bit (LSB) VF'ye kaydedilir, sonra sayı 2'ye bölünür.
+            (8, _, _, 6) => {
+                let x = digit2 as usize;
+                self.v_reg[0xF] = self.v_reg[x] & 0x1;
+                self.v_reg[x] >>= 1;
+            }
+
+            // 8XY7 - SUBN VX, VY (Set VX = VY - VX)
+            (8, _, _, 7) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+
+                self.v_reg[0xF] = if self.v_reg[y] > self.v_reg[x] { 1 } else { 0 };
+                self.v_reg[x] = self.v_reg[y].wrapping_sub(self.v_reg[x]);
+            }
+
+            (8, _, _, 0xE) => {
+                let x = digit2 as usize;
+                self.v_reg[0xF] = (self.v_reg[x] >> 7) & 0x1;
+                self.v_reg[x] <<= 1;
+            }
+
             // 9XY0 - Skip next instruction if VX != VY
             (9, _, _, 0) => {
                 let x = digit2 as usize;
@@ -190,6 +243,13 @@ impl Emu {
             (0xA, _, _, _) => {
                 let nnn = op & 0x0FFF;
                 self.i_reg = nnn;
+            }
+
+            (0xC, _, _, _) => {
+                let x = digit2 as usize;
+                let nn = (op & 0x00FF) as u8;
+                let rng: u8 = rand::random();
+                self.v_reg[x] = rng & nn;
             }
 
             // DXYN - DRAW (Display n-byte sprite starting at memory location I at (VX, VY))
@@ -243,4 +303,16 @@ impl Emu {
 
         self.ram[start..end].copy_from_slice(data);
     }
+    // For test math operations
+    /*  pub fn test_math_setup(&mut self) {
+        self.pc = 0x200;
+        self.v_reg[1] = 10;
+
+
+        self.ram[0x200] = 0xC0;
+        self.ram[0x201] = 0xFF;
+
+        self.ram[0x202] = 0x80;
+        self.ram[0x203] = 0x14;
+    } */
 }
