@@ -1,4 +1,5 @@
 mod emu;
+mod constants;
 
 use std::env;
 use std::fs::File;
@@ -11,9 +12,11 @@ use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use std::time::Duration;
 
+use constants::*;
+
 const SCALE: u32 = 15;
-const WINDOW_WIDTH: u32 = (emu::SCREEN_WIDTH as u32) * SCALE;
-const WINDOW_HEIGHT: u32 = (emu::SCREEN_HEIGHT as u32) * SCALE;
+const WINDOW_WIDTH: u32 = (SCREEN_WIDTH as u32) * SCALE;
+const WINDOW_HEIGHT: u32 = (SCREEN_HEIGHT as u32) * SCALE;
 
 fn main() -> Result<(), String> {
     let args: Vec<String> = env::args().collect();
@@ -77,8 +80,8 @@ fn main() -> Result<(), String> {
 
         for (i, pixel) in screen_buf.iter().enumerate() {
             if *pixel {
-                let x = (i % emu::SCREEN_WIDTH) as u32;
-                let y = (i / emu::SCREEN_WIDTH) as u32;
+                let x = (i % SCREEN_WIDTH) as u32;
+                let y = (i / SCREEN_WIDTH) as u32;
 
                 let rect = Rect::new((x * SCALE) as i32, (y * SCALE) as i32, SCALE, SCALE);
                 canvas.fill_rect(rect)?;

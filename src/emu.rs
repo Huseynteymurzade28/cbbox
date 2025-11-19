@@ -1,29 +1,5 @@
-use rand::Rng;
-
-pub const SCREEN_WIDTH: usize = 64;
-pub const SCREEN_HEIGHT: usize = 32;
-const RAM_SIZE: usize = 4096;
-const REGISTERS_COUNT: usize = 16;
-const STACK_SIZE: usize = 16;
-
-const FONTSET: [u8; 80] = [
-    0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
-    0x20, 0x60, 0x20, 0x20, 0x70, // 1
-    0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
-    0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
-    0x90, 0x90, 0xF0, 0x10, 0x10, // 4
-    0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
-    0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
-    0xF0, 0x10, 0x20, 0x40, 0x40, // 7
-    0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
-    0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
-    0xF0, 0x90, 0xF0, 0x90, 0x90, // A
-    0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
-    0xF0, 0x80, 0x80, 0x80, 0xF0, // C
-    0xE0, 0x90, 0x90, 0x90, 0xE0, // D
-    0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
-    0xF0, 0x80, 0xF0, 0x80, 0x80, // F
-];
+// src/emu.rs
+use crate::constants::*; // constants.rs'deki verileri al
 
 pub struct Emu {
     pc: u16,
@@ -53,16 +29,11 @@ impl Emu {
             sound_timer: 0,
         };
 
+        // Fontları yükle
         new_emu.ram[..80].copy_from_slice(&FONTSET);
 
-        new_emu.ram[0x200] = 0xC0;
-        new_emu.ram[0x201] = 0xFF;
-
-        // 8XY4 -> 8014 -> V0 = V0 + V1 (Toplama testi için)
-        // Önce V1'e bir değer verelim (Manuel)
-        new_emu.v_reg[1] = 10;
-        new_emu.ram[0x202] = 0x80;
-        new_emu.ram[0x203] = 0x14;
+        // DİKKAT: Buradaki eski test kodlarını (0xC0, 0xFF vb.) SİLDİM.
+        // Artık tertemiz bir hafıza ile başlıyor.
 
         new_emu
     }
@@ -92,7 +63,7 @@ impl Emu {
             // 00E0 - CLS (Clear Screen)
             (0, 0, 0xE, 0) => {
                 self.screen = [false; SCREEN_WIDTH * SCREEN_HEIGHT];
-            }
+            } // <-- VİRGÜLLER EKLENDİ
 
             // 00EE - RET (Return from subroutine)
             (0, 0, 0xE, 0xE) => {
@@ -112,10 +83,8 @@ impl Emu {
             // 2NNN - CALL NNN (Call subroutine at NNN)
             (2, _, _, _) => {
                 let nnn = op & 0x0FFF;
-                // Store current PC to stack
                 self.stack[self.sp as usize] = self.pc;
                 self.sp += 1;
-                // Jump to address
                 self.pc = nnn;
             }
 
@@ -153,7 +122,7 @@ impl Emu {
                 self.v_reg[x] = nn;
             }
 
-            // 7XNN - ADD VX, NN (Does not affect carry flag)
+            // 7XNN - ADD VX, NN
             (7, _, _, _) => {
                 let x = digit2 as usize;
                 let nn = (op & 0x00FF) as u8;
@@ -188,42 +157,39 @@ impl Emu {
                 self.v_reg[x] ^= self.v_reg[y];
             }
 
+            // 8XY4 - ADD (Carry)
             (8, _, _, 4) => {
                 let x = digit2 as usize;
                 let y = digit3 as usize;
-
                 let (result, overflow) = self.v_reg[x].overflowing_add(self.v_reg[y]);
                 self.v_reg[x] = result;
                 self.v_reg[0xF] = if overflow { 1 } else { 0 };
             }
 
-            // 8XY5 - SUB VX, VY (Set VF = NOT borrow)
-            // Eğer VX > VY ise VF = 1 (Borç almaya gerek yok)
+            // 8XY5 - SUB (Borrow)
             (8, _, _, 5) => {
                 let x = digit2 as usize;
                 let y = digit3 as usize;
-
                 self.v_reg[0xF] = if self.v_reg[x] > self.v_reg[y] { 1 } else { 0 };
                 self.v_reg[x] = self.v_reg[x].wrapping_sub(self.v_reg[y]);
             }
 
-            // 8XY6 - SHR VX (Shift Right by 1)
-            // En sağdaki bit (LSB) VF'ye kaydedilir, sonra sayı 2'ye bölünür.
+            // 8XY6 - SHR
             (8, _, _, 6) => {
                 let x = digit2 as usize;
                 self.v_reg[0xF] = self.v_reg[x] & 0x1;
                 self.v_reg[x] >>= 1;
             }
 
-            // 8XY7 - SUBN VX, VY (Set VX = VY - VX)
+            // 8XY7 - SUBN
             (8, _, _, 7) => {
                 let x = digit2 as usize;
                 let y = digit3 as usize;
-
                 self.v_reg[0xF] = if self.v_reg[y] > self.v_reg[x] { 1 } else { 0 };
                 self.v_reg[x] = self.v_reg[y].wrapping_sub(self.v_reg[x]);
             }
 
+            // 8XYE - SHL
             (8, _, _, 0xE) => {
                 let x = digit2 as usize;
                 self.v_reg[0xF] = (self.v_reg[x] >> 7) & 0x1;
@@ -245,14 +211,15 @@ impl Emu {
                 self.i_reg = nnn;
             }
 
+            // CXNN - Random
             (0xC, _, _, _) => {
                 let x = digit2 as usize;
                 let nn = (op & 0x00FF) as u8;
-                let rng: u8 = rand::random();
+                let rng: u8 = rand::random(); // Yeni rand kullanımı
                 self.v_reg[x] = rng & nn;
             }
 
-            // DXYN - DRAW (Display n-byte sprite starting at memory location I at (VX, VY))
+            // DXYN - DRAW
             (0xD, _, _, _) => {
                 let x_idx = digit2 as usize;
                 let y_idx = digit3 as usize;
@@ -261,7 +228,6 @@ impl Emu {
                 let x_coord = self.v_reg[x_idx] as u16;
                 let y_coord = self.v_reg[y_idx] as u16;
 
-                // Reset collision flag
                 self.v_reg[0xF] = 0;
 
                 for row in 0..height {
@@ -272,7 +238,6 @@ impl Emu {
                             let draw_x = (x_coord + col) as usize;
                             let draw_y = (y_coord + row) as usize;
 
-                            // Standard Chip-8 clipping
                             if draw_x < SCREEN_WIDTH && draw_y < SCREEN_HEIGHT {
                                 let idx = draw_y * SCREEN_WIDTH + draw_x;
                                 if self.screen[idx] {
@@ -293,6 +258,7 @@ impl Emu {
     pub fn get_display(&self) -> &[bool] {
         &self.screen
     }
+
     pub fn load_rom(&mut self, data: &[u8]) {
         let start = 0x200;
         let end = 0x200 + data.len();
@@ -303,16 +269,4 @@ impl Emu {
 
         self.ram[start..end].copy_from_slice(data);
     }
-    // For test math operations
-    /*  pub fn test_math_setup(&mut self) {
-        self.pc = 0x200;
-        self.v_reg[1] = 10;
-
-
-        self.ram[0x200] = 0xC0;
-        self.ram[0x201] = 0xFF;
-
-        self.ram[0x202] = 0x80;
-        self.ram[0x203] = 0x14;
-    } */
 }
