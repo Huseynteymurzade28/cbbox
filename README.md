@@ -1,4 +1,4 @@
-# CHIP-8 Emulator
+# CBBOX
 
 A CHIP-8 interpreter/emulator written in Rust with SDL2 for graphics rendering.
 
