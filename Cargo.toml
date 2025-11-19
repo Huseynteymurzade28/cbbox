@@ -1,0 +1,8 @@
+[package]
+name = "chip8_emu"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sdl2 = "0.38"
+rand = "0.9.2" 
