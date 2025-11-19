@@ -75,67 +75,149 @@ impl Emu {
         let digit4 = op & 0x000F;
 
         match (digit1, digit2, digit3, digit4) {
-            // NOP
+            // 0000 - NOP (No Operation)
             (0, 0, 0, 0) => return,
 
-            // CLS - Clear screen
+            // 00E0 - CLS (Clear Screen)
             (0, 0, 0xE, 0) => {
                 self.screen = [false; SCREEN_WIDTH * SCREEN_HEIGHT];
             }
 
-            // JMP NNN
+            // 00EE - RET (Return from subroutine)
+            (0, 0, 0xE, 0xE) => {
+                if self.sp == 0 {
+                    panic!("Stack Underflow! No return address found.");
+                }
+                self.sp -= 1;
+                self.pc = self.stack[self.sp as usize];
+            }
+
+            // 1NNN - JMP NNN (Jump to address NNN)
             (1, _, _, _) => {
                 let nnn = op & 0x0FFF;
                 self.pc = nnn;
             }
 
-            // SET VX, NN
+            // 2NNN - CALL NNN (Call subroutine at NNN)
+            (2, _, _, _) => {
+                let nnn = op & 0x0FFF;
+                // Store current PC to stack
+                self.stack[self.sp as usize] = self.pc;
+                self.sp += 1;
+                // Jump to address
+                self.pc = nnn;
+            }
+
+            // 3XNN - Skip next instruction if VX == NN
+            (3, _, _, _) => {
+                let x = digit2 as usize;
+                let nn = (op & 0x00FF) as u8;
+                if self.v_reg[x] == nn {
+                    self.pc += 2;
+                }
+            }
+
+            // 4XNN - Skip next instruction if VX != NN
+            (4, _, _, _) => {
+                let x = digit2 as usize;
+                let nn = (op & 0x00FF) as u8;
+                if self.v_reg[x] != nn {
+                    self.pc += 2;
+                }
+            }
+
+            // 5XY0 - Skip next instruction if VX == VY
+            (5, _, _, 0) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+                if self.v_reg[x] == self.v_reg[y] {
+                    self.pc += 2;
+                }
+            }
+
+            // 6XNN - SET VX = NN
             (6, _, _, _) => {
                 let x = digit2 as usize;
                 let nn = (op & 0x00FF) as u8;
                 self.v_reg[x] = nn;
             }
 
-            // ADD VX, NN
+            // 7XNN - ADD VX, NN (Does not affect carry flag)
             (7, _, _, _) => {
                 let x = digit2 as usize;
                 let nn = (op & 0x00FF) as u8;
                 self.v_reg[x] = self.v_reg[x].wrapping_add(nn);
             }
-            // SET I
+
+            // 8XY0 - SET VX = VY
+            (8, _, _, 0) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+                self.v_reg[x] = self.v_reg[y];
+            }
+
+            // 8XY1 - OR VX, VY
+            (8, _, _, 1) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+                self.v_reg[x] |= self.v_reg[y];
+            }
+
+            // 8XY2 - AND VX, VY
+            (8, _, _, 2) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+                self.v_reg[x] &= self.v_reg[y];
+            }
+
+            // 8XY3 - XOR VX, VY
+            (8, _, _, 3) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+                self.v_reg[x] ^= self.v_reg[y];
+            }
+
+            // 9XY0 - Skip next instruction if VX != VY
+            (9, _, _, 0) => {
+                let x = digit2 as usize;
+                let y = digit3 as usize;
+                if self.v_reg[x] != self.v_reg[y] {
+                    self.pc += 2;
+                }
+            }
+
+            // ANNN - SET I = NNN
             (0xA, _, _, _) => {
                 let nnn = op & 0x0FFF;
                 self.i_reg = nnn;
             }
 
-            // DXYN - Draw sprite
+            // DXYN - DRAW (Display n-byte sprite starting at memory location I at (VX, VY))
             (0xD, _, _, _) => {
-                let x_reg_idx = digit2 as usize;
-                let y_reg_idx = digit3 as usize;
+                let x_idx = digit2 as usize;
+                let y_idx = digit3 as usize;
                 let height = digit4 as u16;
 
-                let x_coord = self.v_reg[x_reg_idx] as u16;
-                let y_coord = self.v_reg[y_reg_idx] as u16;
+                let x_coord = self.v_reg[x_idx] as u16;
+                let y_coord = self.v_reg[y_idx] as u16;
 
+                // Reset collision flag
                 self.v_reg[0xF] = 0;
 
                 for row in 0..height {
                     let sprite_byte = self.ram[(self.i_reg + row) as usize];
-
                     for col in 0..8 {
                         let pixel_bit = (sprite_byte >> (7 - col)) & 1;
-
                         if pixel_bit != 0 {
                             let draw_x = (x_coord + col) as usize;
                             let draw_y = (y_coord + row) as usize;
 
+                            // Standard Chip-8 clipping
                             if draw_x < SCREEN_WIDTH && draw_y < SCREEN_HEIGHT {
                                 let idx = draw_y * SCREEN_WIDTH + draw_x;
-
                                 if self.screen[idx] {
                                     self.v_reg[0xF] = 1;
                                 }
-
                                 self.screen[idx] ^= true;
                             }
                         }
@@ -143,7 +225,8 @@ impl Emu {
                 }
             }
 
-            _ => println!("Unknown opcode: {:04X}", op),
+            // Unhandled Opcode
+            _ => println!("Unimplemented Opcode: {:04X}", op),
         }
     }
 
