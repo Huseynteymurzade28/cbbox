@@ -250,6 +250,103 @@ impl Emu {
                 }
             }
 
+            // EX9E - Skip next instruction if key stored in VX is pressed
+            (0xE, _, 9, 0xE) => {
+                let x = digit2 as usize;
+                let key = self.v_reg[x] as usize;
+                if self.keys[key] {
+                    self.pc += 2;
+                }
+            }
+
+            // EXA1 - Skip next instruction if key stored in VX is NOT pressed
+            (0xE, _, 0xA, 1) => {
+                let x = digit2 as usize;
+                let key = self.v_reg[x] as usize;
+                if !self.keys[key] {
+                    self.pc += 2;
+                }
+            }
+
+            // FX07 - Set VX = Delay Timer
+            (0xF, _, 0, 7) => {
+                let x = digit2 as usize;
+                self.v_reg[x] = self.delay_timer;
+            }
+
+            // FX0A - Wait for a key press, store the value of the key in VX
+            (0xF, _, 0, 0xA) => {
+                let x = digit2 as usize;
+                let mut pressed = false;
+                for i in 0..16 {
+                    if self.keys[i] {
+                        self.v_reg[x] = i as u8;
+                        pressed = true;
+                        break;
+                    }
+                }
+                // If no key is pressed, decrement PC to repeat this instruction
+                // Effectively pausing the CPU until a key is pressed
+                if !pressed {
+                    self.pc -= 2;
+                }
+            }
+
+            // FX15 - Set Delay Timer = VX
+            (0xF, _, 1, 5) => {
+                let x = digit2 as usize;
+                self.delay_timer = self.v_reg[x];
+            }
+
+            // FX18 - Set Sound Timer = VX
+            (0xF, _, 1, 8) => {
+                let x = digit2 as usize;
+                self.sound_timer = self.v_reg[x];
+            }
+
+            // FX1E - ADD I, VX
+            (0xF, _, 1, 0xE) => {
+                let x = digit2 as usize;
+                self.i_reg = self.i_reg.wrapping_add(self.v_reg[x] as u16);
+            }
+
+            // FX29 - Set I = location of sprite for digit VX
+            (0xF, _, 2, 9) => {
+                let x = digit2 as usize;
+                let digit = self.v_reg[x] as u16;
+                // Fonts are located at the start of RAM (0x000), 5 bytes each
+                self.i_reg = digit * 5;
+            }
+
+            // FX33 - Store BCD representation of VX in memory locations I, I+1, and I+2
+            // (Binary Coded Decimal: 156 -> 1, 5, 6)
+            (0xF, _, 3, 3) => {
+                let x = digit2 as usize;
+                let value = self.v_reg[x];
+                // Hundreds place
+                self.ram[self.i_reg as usize] = value / 100;
+                // Tens place
+                self.ram[(self.i_reg + 1) as usize] = (value / 10) % 10;
+                // Ones place
+                self.ram[(self.i_reg + 2) as usize] = value % 10;
+            }
+
+            // FX55 - Store registers V0 through VX in memory starting at location I
+            (0xF, _, 5, 5) => {
+                let x = digit2 as usize;
+                for i in 0..=x {
+                    self.ram[self.i_reg as usize + i] = self.v_reg[i];
+                }
+            }
+
+            // FX65 - Read registers V0 through VX from memory starting at location I
+            (0xF, _, 6, 5) => {
+                let x = digit2 as usize;
+                for i in 0..=x {
+                    self.v_reg[i] = self.ram[self.i_reg as usize + i];
+                }
+            }
+
             // Unhandled Opcode
             _ => println!("Unimplemented Opcode: {:04X}", op),
         }
@@ -268,5 +365,24 @@ impl Emu {
         }
 
         self.ram[start..end].copy_from_slice(data);
+    }
+
+    // Decrement timers (Should be called at 60Hz)
+    pub fn tick_timers(&mut self) {
+        if self.delay_timer > 0 {
+            self.delay_timer -= 1;
+        }
+        if self.sound_timer > 0 {
+            if self.sound_timer == 1 {
+                // BEEP sound will be implemented here later
+                // println!("BEEP!"); 
+            }
+            self.sound_timer -= 1;
+        }
+    }
+
+    // Update key state
+    pub fn keypress(&mut self, idx: usize, pressed: bool) {
+        self.keys[idx] = pressed;
     }
 }
