@@ -1,13 +1,18 @@
+// src/main.rs
+
+mod audio;
 mod constants;
-mod emu;
+mod emu; // Importing the new audio module
 
 use std::env;
 use std::fs::File;
 use std::io::Read;
 
+use audio::SquareWave;
 use constants::*;
-use emu::Emu; // Import constants like SCREEN_WIDTH
+use emu::Emu; // Using the struct from audio.rs
 
+use sdl2::audio::AudioSpecDesired;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
@@ -28,12 +33,13 @@ fn main() -> Result<(), String> {
     }
     let rom_path = &args[1];
 
-    // 2. Initialize SDL2
+    // 2. Initialize SDL2 Subsystems
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
+    let audio_subsystem = sdl_context.audio()?; // Initialize Audio
 
     let window = video_subsystem
-        .window("Chippy - CHIP-8 Emulator", WINDOW_WIDTH, WINDOW_HEIGHT)
+        .window("Chippy - CHIP-8 Emulator v1.1", WINDOW_WIDTH, WINDOW_HEIGHT)
         .position_centered()
         .opengl()
         .build()
@@ -46,6 +52,25 @@ fn main() -> Result<(), String> {
         .map_err(|e| e.to_string())?;
 
     let mut event_pump = sdl_context.event_pump()?;
+
+    // --- AUDIO SETUP START ---
+    let desired_spec = AudioSpecDesired {
+        freq: Some(44100),  // CD Quality
+        channels: Some(1),  // Mono
+        samples: Some(256), // Default buffer size
+    };
+
+    // Open the audio device using the SquareWave struct from audio.rs
+    let device = audio_subsystem
+        .open_playback(None, &desired_spec, |spec| {
+            SquareWave {
+                phase_inc: 440.0 / spec.freq as f32, // 440Hz (A4 Note)
+                phase: 0.0,
+                volume: 0.15, // Low volume to be safe
+            }
+        })
+        .map_err(|e| e.to_string())?;
+    // --- AUDIO SETUP END ---
 
     // 3. Initialize Emulator & Load ROM
     let mut chip8 = Emu::new();
@@ -89,14 +114,21 @@ fn main() -> Result<(), String> {
             }
         }
 
-        // B. CPU Instructions
-        // Execute multiple CPU cycles for every single frame drawn (Speed up)
+        // B. CPU Cycles
         for _ in 0..TICKS_PER_FRAME {
             chip8.tick();
         }
 
-        // C. Timers (Run at 60Hz)
+        // C. Timers
         chip8.tick_timers();
+
+        // --- AUDIO CONTROL ---
+        // If the sound timer > 0, play sound. Otherwise, pause.
+        if chip8.get_sound_timer() > 0 {
+            device.resume();
+        } else {
+            device.pause();
+        }
 
         // D. Render
         canvas.set_draw_color(Color::RGB(0, 0, 0));
@@ -115,36 +147,28 @@ fn main() -> Result<(), String> {
         }
         canvas.present();
 
-        // Sleep to maintain approx 60 FPS
+        // 60 FPS Delay
         ::std::thread::sleep(Duration::from_micros(16600));
     }
 
     Ok(())
 }
 
-// Helper function to map Keyboard keys to CHIP-8 Keypad
-// CHIP-8 Keypad:    Keyboard Mapping (QWERTY):
-// 1 2 3 C           1 2 3 4
-// 4 5 6 D    -->    Q W E R
-// 7 8 9 E           A S D F
-// A 0 B F           Z X C V
+// Keyboard Mapping Helper
 fn key2btn(key: Keycode) -> Option<usize> {
     match key {
         Keycode::Num1 => Some(0x1),
         Keycode::Num2 => Some(0x2),
         Keycode::Num3 => Some(0x3),
         Keycode::Num4 => Some(0xC),
-
         Keycode::Q => Some(0x4),
         Keycode::W => Some(0x5),
         Keycode::E => Some(0x6),
         Keycode::R => Some(0xD),
-
         Keycode::A => Some(0x7),
         Keycode::S => Some(0x8),
         Keycode::D => Some(0x9),
         Keycode::F => Some(0xE),
-
         Keycode::Z => Some(0xA),
         Keycode::X => Some(0x0),
         Keycode::C => Some(0xB),

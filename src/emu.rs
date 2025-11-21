@@ -375,7 +375,7 @@ impl Emu {
         if self.sound_timer > 0 {
             if self.sound_timer == 1 {
                 // BEEP sound will be implemented here later
-                // println!("BEEP!"); 
+                // println!("BEEP!");
             }
             self.sound_timer -= 1;
         }
@@ -384,5 +384,9 @@ impl Emu {
     // Update key state
     pub fn keypress(&mut self, idx: usize, pressed: bool) {
         self.keys[idx] = pressed;
+    }
+
+    pub fn get_sound_timer(&self) -> u8 {
+        self.sound_timer
     }
 }
