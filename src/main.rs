@@ -2,7 +2,8 @@
 
 mod audio;
 mod constants;
-mod emu; // Importing the new audio module
+mod emu;
+mod gui; // GUI module
 
 use std::env;
 use std::fs::File;
@@ -25,13 +26,22 @@ const WINDOW_HEIGHT: u32 = (SCREEN_HEIGHT as u32) * SCALE;
 const TICKS_PER_FRAME: usize = 10; // CPU speed multiplier
 
 fn main() -> Result<(), String> {
-    // 1. Parse Command Line Arguments
+    // 1. Parse Command Line Arguments or Show GUI
     let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        println!("Usage: cargo run <rom_file>");
-        return Ok(());
-    }
-    let rom_path = &args[1];
+
+    let rom_path = if args.len() >= 2 {
+        // If a ROM path is provided as argument, use it directly
+        args[1].clone()
+    } else {
+        // Otherwise, show GUI to select ROM
+        match gui::show_rom_selector()? {
+            Some(path) => path,
+            None => {
+                println!("No ROM selected. Exiting...");
+                return Ok(());
+            }
+        }
+    };
 
     // 2. Initialize SDL2 Subsystems
     let sdl_context = sdl2::init()?;
@@ -75,14 +85,14 @@ fn main() -> Result<(), String> {
     // 3. Initialize Emulator & Load ROM
     let mut chip8 = Emu::new();
 
-    let mut rom_file = File::open(rom_path).map_err(|e| e.to_string())?;
+    let mut rom_file = File::open(&rom_path).map_err(|e| e.to_string())?;
     let mut buffer = Vec::new();
     rom_file
         .read_to_end(&mut buffer)
         .map_err(|e| e.to_string())?;
 
     chip8.load_rom(&buffer);
-    println!("🚀 ROM Loaded: {}", rom_path);
+    println!("🚀 ROM Loaded: {}", &rom_path);
 
     // 4. Main Game Loop
     'running: loop {
