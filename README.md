@@ -12,6 +12,7 @@ CHIP-8 is an interpreted programming language developed in the mid-1970s for ear
 - ✅ 64x32 monochrome display
 - ✅ SDL2-based rendering
 - ✅ Configurable display scaling
+- ✅ **GUI ROM selector** - Browse and load ROMs from a visual interface
 - 🚧 Keyboard input (in progress)
 - 🚧 Sound support (in progress)
 
@@ -63,16 +64,28 @@ cargo build --release
 
 ## Usage
 
-Run with a CHIP-8 ROM file:
+**Option 1: Launch GUI ROM Selector (Recommended)**
+
+Simply run without arguments to open the graphical ROM selector:
 
 ```bash
-cargo run --release <rom_file>
+cargo run --release
+```
+
+The GUI will display all available ROMs in the `assets/` directory. Click on any ROM to launch the emulator.
+
+**Option 2: Direct ROM Loading**
+
+Run directly with a CHIP-8 ROM file path:
+
+```bash
+cargo run --release -- <rom_file>
 ```
 
 Example:
 
 ```bash
-cargo run --release ibm.ch8
+cargo run --release -- assets/ibm.ch8
 ```
 
 ### Controls
@@ -85,9 +98,17 @@ cargo run --release ibm.ch8
 ```
 emulator/
 ├── Cargo.toml          # Project dependencies
+├── assets/             # CHIP-8 ROM files
+│   ├── ibm.ch8
+│   ├── Pong.ch8
+│   ├── tetris.ch8
+│   └── ...
 ├── src/
-│   ├── main.rs         # Entry point, SDL2 setup, game loop
-│   └── emu.rs          # CHIP-8 CPU implementation
+│   ├── main.rs         # Entry point, argument handling
+│   ├── gui.rs          # GUI ROM selector interface
+│   ├── emu.rs          # CHIP-8 CPU implementation
+│   ├── audio.rs        # Audio handling
+│   └── constants.rs    # Constants and configuration
 └── README.md
 ```
 
@@ -109,8 +130,10 @@ emulator/
 - [ ] Add keyboard input handling (CHIP-8 hex keypad)
 - [ ] Implement delay and sound timers
 - [ ] Add configurable CPU speed
-- [ ] ROM file selection UI
+- [x] ~~ROM file selection UI~~ ✅ Implemented!
 - [ ] Save/load state functionality
+- [ ] Pause/Resume controls in emulator
+- [ ] Display FPS counter
 
 ## Resources
 
