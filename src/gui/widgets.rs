@@ -187,24 +187,23 @@ pub fn show_footer(ui: &mut egui::Ui, theme: &Theme, rom_count: usize) {
 
     ui.add_space(15.0);
 
-    ui.horizontal(|ui| {
-        ui.label(egui::RichText::new("🔥").size(18.0));
-        ui.label(
-            egui::RichText::new(format!("{} ROMS LOADED", rom_count))
-                .color(theme.primary)
-                .size(14.0)
-                .strong(),
-        );
+    let screen = ui.ctx().screen_rect(); // ekran boyutu
 
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.label(
-                egui::RichText::new("[ESC] EXIT")
-                    .color(theme.accent)
-                    .size(13.0)
-                    .strong(),
-            );
-        });
-    });
+    let top_left = screen.min + egui::vec2(10.0, 10.0);
+
+    ui.allocate_ui_at_rect(
+        egui::Rect::from_min_size(top_left, egui::vec2(200.0, 30.0)),
+        |ui| {
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new(format!("{} ROMS LOADED", rom_count))
+                        .color(theme.primary)
+                        .size(14.0)
+                        .strong(),
+                );
+            });
+        },
+    );
 }
 
 /// Boş durum ekranı (ROM bulunamadığında) - RETRO ERROR
