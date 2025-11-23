@@ -127,23 +127,12 @@ pub fn show_header(ui: &mut egui::Ui, theme: &Theme) {
     ui.vertical_centered(|ui| {
         ui.add_space(20.0);
 
-        // RETRO ana başlık - neon yeşil
-        ui.label(
-            egui::RichText::new("━━━━━━━━━━━━━━━━━━━━")
-                .size(16.0)
-                .color(theme.primary),
-        );
         ui.add_space(8.0);
         ui.label(
             egui::RichText::new("🎮 CHIP-8 EMULATOR 🎮")
                 .size(42.0)
                 .color(theme.primary)
                 .strong(),
-        );
-        ui.label(
-            egui::RichText::new("━━━━━━━━━━━━━━━━━━━━")
-                .size(16.0)
-                .color(theme.primary),
         );
 
         ui.add_space(10.0);

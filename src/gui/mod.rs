@@ -1,5 +1,6 @@
 // src/gui/mod.rs
 pub mod app;
+pub mod settings;
 pub mod theme;
 pub mod widgets;
 
